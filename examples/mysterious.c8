@@ -1,0 +1,185 @@
+// REGISTER V5 AND V6 ARE DRAW COORDINATE
+// REGISTER V7 USED TO DETECT KEY PRESS
+// REGISTER V8 SET TO FF UNTIL FIRST DIGIT CHOSEN THEN 00
+// REGISTER V9 STORE TENTH DIGIT
+// REGISTER VA STORE UNIT DIGIT
+// REGISTER VD STORE 0x80 A MASK USED FOR COMPARISON
+// REGISTER VE STORE THE RANDOMED NUMBER
+LD VD 80 // MASK
+~start
+// Draw 'GUESS'
+CLS
+LD V9 F
+LD I ~guess
+LD V5 12
+LD VB 5
+LD V6 D; DRW V5 V6 5
+ADD I VB; ADD V5 8; DRW V5 V6 5
+ADD I VB; ADD V5 8; DRW V5 V6 5
+ADD I VB; ADD V5 8; DRW V5 V6 5
+// Wait until the F key is pressed
+~wait-F
+SKP V9
+JP ~wait-F
+CALL ~rnd
+~queryNumber
+LD V8 FF
+CLS
+LD V5 1B // x coordinate for drawing
+LD V9 F
+~queryDigit
+LD V7 0
+~loopKey
+SKNP V7
+JP ~keypressed
+ADD V7 1
+SNE V7 A
+LD V7 0
+LD V0 DT
+SNE V8 V0 // Consider only one digit if too long to chose
+JP ~considerSingleDigit
+JP ~loopKey
+~keypressed
+SE V9 F // First digit chosen
+JP ~secondChosen
+LD V9 V7
+LD V1 V9
+LD V2 5
+CALL ~multiply
+LD I 0
+ADD I V0
+DRW V5 V6 5
+LD V8 0
+// wait a moment to stop pressing key if user want
+LD V0 5
+CALL ~wait
+LD V0 28
+LD DT V0
+JP ~queryDigit
+~secondChosen
+LD VA V7
+LD V1 VA
+LD V2 5
+CALL ~multiply
+LD I 0
+ADD I V0
+ADD V5 7
+DRW V5 V6 5
+// Both digits are chosen, convert to hex
+JP ~bothChosen
+~bothChosen
+LD V2 A
+LD V1 V9
+CALL ~multiply
+ADD V0 VA
+~evaluateVictory
+SNE V0 VE
+JP ~victory
+SUB V0 VE
+AND V0 VD
+SE V0 VD
+JP ~is-inferior
+JP ~is-superior
+
+~considerSingleDigit
+LD V0 V9
+JP ~evaluateVictory
+
+~is-inferior
+CALL ~inferior
+JP ~queryNumber
+~is-superior
+CALL ~superior
+JP ~queryNumber
+
+~victory
+LD V0 A
+LD ST V0
+LD V0 A
+LD V1 F
+~loopVictory
+SKNP V1
+JP ~end
+SKNP V0
+JP ~start
+JP ~loopVictory
+
+
+// FUNCTIONS
+~multiply
+	// V0 = V1 * V2
+	// Modify V0, V1, V2, V3
+	LD V3 0; LD V0 0
+	~multiply-loop
+	SNE V3 V2
+	JP ~multiply-return
+	ADD V3 1
+	ADD V0 V1
+	JP ~multiply-loop
+	~multiply-return
+	RET
+
+~rnd
+	// Return a random number between 0x00-0x63 (0-99)
+	// Set the chosen number in VE
+	// Require VD = 0x80
+	// If DT tick V0 time VE is set to 4
+	// Modify V0, VE, DT
+	LD V0 E // Time to wait before giving up
+	LD DT V0
+	~rnd-loop
+	RND VE 7F // Random (0-127)
+	LD V0 63 // Max number
+	SUB V0 VE
+	AND V0 VD
+	SE V0 VD
+	JP ~rnd-wait
+	LD V0 DT
+	SE V0 0
+	JP ~rnd-loop
+	LD VE 4
+	JP ~rnd-return
+	~rnd-wait
+	CALL ~wait
+	~rnd-return
+	RET
+
+~inferior // Clean screen, display a '<' sign and wait a bit
+	CLS
+	LD V5 1C
+	LD I ~<
+	DRW V5 V6 7
+	LD V0 1F
+	CALL ~wait
+	RET
+
+~superior // Clean screen, display a '>' sign and wait a bit
+	CLS
+	LD V5 1C
+	LD I ~>
+	DRW V5 V6 7
+	LD V0 1F
+	CALL ~wait
+	RET
+
+~wait
+	// Set DT to V0 and wait until it reaches 0.
+	// Modify V1
+	LD DT V0
+	~wait-loop
+	LD V1 DT
+	SE V1 0
+	JP ~wait-loop
+	RET
+
+
+// GRAPHISM
+~guess
+F282; B292; F34F; 484F; 48CF
+3C20; 3C04; 3CF0; 80F0; 10F0
+~<
+1020; 4080; 4020; 10;
+~>
+0804; 0201; 0204; 08;
+~end
+CLS
